@@ -215,6 +215,8 @@ client.on('messageCreate', async message => {
                 '**!say <msg>** – Bot says your message (Admins only)',
                 '**!ping** – Show bot latency',
                 '**!warn @user** – Warn a user (5 = mute, 10 = ban)',
+                '**!purge <number>** – Delete recent messages',
+                '**!purge after <messageID>** – Delete messages after a specific message',
                 '**!setlog <#channel | id>** – Set log channel',
                 '**!clearlog** – Stop logging events',
             ].join('\n'))
@@ -245,6 +247,41 @@ client.on('messageCreate', async message => {
         saveLogConfig();
 
         return sendEmbed(message.channel, 'Log Channel Cleared', 'Logging has been disabled for this server.');
+    }
+
+    // --- Purge ---
+    if (command === 'purge') {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages))
+            return sendEmbed(message.channel, 'Error', 'You do not have permission to manage messages.', 0xFF0000);
+
+        if (!args[0]) return sendEmbed(message.channel, 'Error', 'Usage: `!purge <number>` or `!purge after <messageID>`', 0xFF0000);
+
+        if (args[0].toLowerCase() === 'after') {
+            const afterID = args[1];
+            if (!afterID) return sendEmbed(message.channel, 'Error', 'Please provide a message ID.', 0xFF0000);
+
+            try {
+                const messages = await message.channel.messages.fetch({ limit: 100 });
+                const msgsToDelete = messages.filter(m => m.id > afterID);
+                await message.channel.bulkDelete(msgsToDelete, true);
+                return sendEmbed(message.channel, 'Messages Deleted', `Deleted ${msgsToDelete.size} messages after ID ${afterID}.`);
+            } catch (err) {
+                console.error(err);
+                return sendEmbed(message.channel, 'Error', 'Could not delete messages. Make sure they are under 14 days old.', 0xFF0000);
+            }
+        } else {
+            const amount = parseInt(args[0]);
+            if (isNaN(amount) || amount < 1 || amount > 100)
+                return sendEmbed(message.channel, 'Error', 'Please provide a number between 1 and 100.', 0xFF0000);
+
+            try {
+                await message.channel.bulkDelete(amount, true);
+                return sendEmbed(message.channel, 'Messages Deleted', `Deleted ${amount} messages.`);
+            } catch (err) {
+                console.error(err);
+                return sendEmbed(message.channel, 'Error', 'Could not delete messages. Make sure they are under 14 days old.', 0xFF0000);
+            }
+        }
     }
 });
 
